@@ -507,6 +507,7 @@ export default function App() {
   const [tab,setTab] = useState("dashboard");
   const [quarter,setQuarter] = useState("Q2 2026");
   const [activities,setActivities] = useState([]);
+  const [allActivities,setAllActivities] = useState([]);
   const [syncing,setSyncing] = useState(false);
   const [loading,setLoading] = useState(false);
   const [modal,setModal] = useState(null);
@@ -521,7 +522,15 @@ export default function App() {
   const showToast = msg => { setToast(msg); setTimeout(()=>setToast(""),2800); };
   const sync = useCallback(async()=>{
     setSyncing(true);
-    try { const d=await loadActivities(quarter); setActivities(d); showToast(`✓ ${d.length} atividades`); }
+    try {
+      const [byQ, all] = await Promise.all([
+        loadActivities(quarter),
+        loadActivities("Todos"),
+      ]);
+      setActivities(byQ);
+      setAllActivities(all);
+      showToast(`✓ ${byQ.length} atividades`);
+    }
     catch(e) { showToast("⚠️ "+e.message); }
     setSyncing(false);
   },[quarter]);
@@ -724,7 +733,7 @@ export default function App() {
         )}
 
         {tab==="kanban"&&<KanbanView activities={activities}/>}
-        {tab==="regioes"&&<RegionView activities={activities}/>}
+        {tab==="regioes"&&<RegionView activities={allActivities.length>0?allActivities:activities}/>}
         {tab==="executive"&&<ExecutiveView activities={activities} quarter={quarter}/>}
 
         {tab==="log"&&(
