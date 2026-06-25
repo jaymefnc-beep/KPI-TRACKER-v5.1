@@ -246,22 +246,10 @@ const RegionView = ({activities}) => {
 
   const fmtQ = q => q ? q.replace("2025","25").replace("2026","26").replace(" ","") : "";
 
-  // Map column name to keywords to search in Atividade or Nome Treinamento
-  const TREIN_KEYWORDS = {
-    "Safe City Solution 2.0": ["safe city solution","safe city sol"],
-    "Safe State 2.0": ["safe state"],
-    "Mobile Enforcement 2.0": ["mobile enforcement","mobile enf"],
-    "Guanlan Large Scale": ["guanlan","large scale"],
-  };
-
   const getTreinQ = (integrador, treinNome) => {
-    const keywords = TREIN_KEYWORDS[treinNome] || [treinNome.toLowerCase()];
-    const match = filteredTrein.find(a => {
-      if (a.Integrador !== integrador) return false;
-      const ativ = (a.Atividade || "").toLowerCase();
-      const nomeTrein = (a["Nome Treinamento"] || "").toLowerCase();
-      return keywords.some(kw => ativ.includes(kw) || nomeTrein.includes(kw));
-    });
+    const match = filteredTrein.find(a =>
+      a.Integrador === integrador && a["Treinamento ID"] === treinNome
+    );
     return match ? fmtQ(match.Quarter) : "";
   };
 
