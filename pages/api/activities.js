@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     const { quarter } = req.query;
     try {
-      const filter = quarter && quarter !== "Todos" ? { property: "Quarter", select: { equals: quarter } } : undefined;
+      const filter = (quarter && quarter !== "Todos" && quarter !== "todos") ? { property: "Quarter", select: { equals: quarter } } : undefined;
       const response = await notion.databases.query({ database_id: DATABASE_ID, filter, sorts: [{ property: "Data", direction: "descending" }], page_size: 100 });
       res.status(200).json(response.results.map(pageToActivity));
     } catch(e) { res.status(500).json({ error: e.message }); }
