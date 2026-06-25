@@ -9,6 +9,22 @@ const ETAPA_COLOR = {"Spec-In":"#3B82F6","BOM":"#8B5CF6","BID":"#EAB308"};
 const STATUS_LIST = ["Em Andamento","Concluído","Suspenso"];
 const STATUS_COLOR = {"Em Andamento":"#F97316","Concluído":"#10B981","Suspenso":"#EF4444"};
 const CAT_COLOR = {"Pre Vendas":"#3B82F6","PoC":"#F97316","Treinamento":"#10B981","Reunião":"#8B5CF6","Suporte":"#EAB308","Evento":"#EC4899","Closed Won":"#EF4444"};
+const ESTADOS = ["PR","RS","SC","SP","MG","RJ","Outro"];
+const ESTADO_COLOR = {"PR":"#3B82F6","RS":"#10B981","SC":"#8B5CF6","SP":"#F97316","MG":"#EAB308","RJ":"#EF4444","Outro":"#94A3B8"};
+const REGIOES = ["Sul","Sudeste","Ambas"];
+const TIPO_ATIV = ["Treinamento","Apresentação"];
+const TIPO_TREIN = ["SBI","SBF","SBC"];
+const DSI_OPTS = ["Designed","Non Designed"];
+
+const INTEGRADORES = {
+  PR: ["Intersept","L8","Teletex"],
+  RS: ["Vigillare"],
+  SC: ["Khronos","Xpti","Mopen"],
+  SP: ["Flama","ARC","Grupo Painel","Alerta"],
+  MG: ["Emive","Método"],
+  RJ: ["Multiviz","RealSeg","7LAN","WP"],
+};
+const ALL_INTEGRADORES = [...new Set(Object.values(INTEGRADORES).flat())].sort();
 
 async function apiFetch(path, opts={}) {
   const r = await fetch(path, {headers:{"Content-Type":"application/json"},...opts});
@@ -32,30 +48,73 @@ const Tip = ({active,payload,label}) => {
 
 const Modal = ({entry,onSave,onClose,defaultQuarter}) => {
   const isEdit = !!entry?.id;
-  const blank = {Atividade:"",Categoria:"Pre Vendas",Etapa:"BOM",Status:"Em Andamento","Cliente Final":"",Integrador:"",Quarter:defaultQuarter,"Valor (R$)":"","Meta Quarter (R$)":"",Data:"",Observações:""};
+  const blank = {Atividade:"",Categoria:"Pre Vendas",Etapa:"BOM",Status:"Em Andamento","Cliente Final":"",Integrador:"",Estado:"SP",Região:"Sudeste",DSI:"Designed","Tipo Atividade":"","Tipo Treinamento":"","Nome Treinamento":"",Quarter:defaultQuarter,"Valor (R$)":"","Meta Quarter (R$)":"",Data:"",Observações:""};
   const [form,setForm] = useState(isEdit?{...entry}:blank);
   const [saving,setSaving] = useState(false);
+
   const set = (k,v) => setForm(f=>{
     const n={...f,[k]:v};
     if (k==="Categoria"&&v!=="Pre Vendas") n.Etapa="";
     if (k==="Categoria"&&v==="Pre Vendas") n.Etapa="BOM";
+    if (k==="Categoria"&&v==="Treinamento") n["Tipo Atividade"]="Treinamento";
+    if (k==="Estado") {
+      const reg = ["PR","RS","SC"].includes(v)?"Sul":["MG","RJ","SP"].includes(v)?"Sudeste":"Ambas";
+      n.Região=reg;
+    }
     return n;
   });
+
+  const integradorOptions = form.Estado && INTEGRADORES[form.Estado] ? INTEGRADORES[form.Estado] : ALL_INTEGRADORES;
   const inp = {width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #E2E8F0",fontSize:13,color:"#1E293B",background:"#F8FAFC",outline:"none",boxSizing:"border-box"};
   const lbl = {fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:4};
   const save = async () => {
     if (!form.Atividade.trim()) return alert("Informe o título.");
     setSaving(true); await onSave(form); setSaving(false);
   };
+
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.55)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div style={{background:"#fff",borderRadius:16,width:"100%",maxWidth:520,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 24px 64px rgba(0,0,0,0.2)"}}>
+      <div style={{background:"#fff",borderRadius:16,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 24px 64px rgba(0,0,0,0.2)"}}>
         <div style={{padding:"20px 24px 16px",borderBottom:"1px solid #F1F5F9",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <span style={{fontSize:15,fontWeight:700,color:"#0F172A"}}>{isEdit?"Editar":"Nova Atividade"}</span>
           <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:"#94A3B8"}}>×</button>
         </div>
         <div style={{padding:"20px 24px",display:"flex",flexDirection:"column",gap:14}}>
           <div><label style={lbl}>Título</label><input style={inp} value={form.Atividade} onChange={e=>set("Atividade",e.target.value)} placeholder="Ex: BOM — Prefeitura Cubatão"/></div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            <div><label style={lbl}>Cliente Final</label><input style={inp} value={form["Cliente Final"]} onChange={e=>set("Cliente Final",e.target.value)} placeholder="Ex: Prefeitura Cubatão"/></div>
+            <div><label style={lbl}>Integrador</label>
+              <select style={inp} value={form.Integrador} onChange={e=>set("Integrador",e.target.value)}>
+                <option value="">— Selecione —</option>
+                {integradorOptions.map(i=><option key={i}>{i}</option>)}
+                <option value="__outro">Outro...</option>
+              </select>
+              {form.Integrador==="__outro"&&<input style={{...inp,marginTop:6}} placeholder="Digite o integrador" onChange={e=>set("Integrador",e.target.value)}/>}
+            </div>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+            <div><label style={lbl}>Estado</label>
+              <select style={inp} value={form.Estado} onChange={e=>set("Estado",e.target.value)}>
+                <option value="">—</option>
+                {ESTADOS.map(e=><option key={e}>{e}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>Região</label>
+              <select style={inp} value={form.Região} onChange={e=>set("Região",e.target.value)}>
+                <option value="">—</option>
+                {REGIOES.map(r=><option key={r}>{r}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>DSI</label>
+              <select style={inp} value={form.DSI} onChange={e=>set("DSI",e.target.value)}>
+                <option value="">—</option>
+                {DSI_OPTS.map(d=><option key={d}>{d}</option>)}
+              </select>
+            </div>
+          </div>
+
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             <div><label style={lbl}>Categoria</label>
               <select style={inp} value={form.Categoria} onChange={e=>set("Categoria",e.target.value)}>
@@ -64,10 +123,34 @@ const Modal = ({entry,onSave,onClose,defaultQuarter}) => {
             </div>
             <div><label style={lbl}>Etapa</label>
               {form.Categoria==="Pre Vendas"
-                ? <select style={inp} value={form.Etapa} onChange={e=>set("Etapa",e.target.value)}>{ETAPAS.map(e=><option key={e}>{e}</option>)}</select>
-                : <select style={{...inp,opacity:0.4,cursor:"not-allowed"}} disabled><option>— N/A —</option></select>}
+                ?<select style={inp} value={form.Etapa} onChange={e=>set("Etapa",e.target.value)}>{ETAPAS.map(e=><option key={e}>{e}</option>)}</select>
+                :<select style={{...inp,opacity:0.4,cursor:"not-allowed"}} disabled><option>— N/A —</option></select>}
             </div>
           </div>
+
+          {form.Categoria==="Treinamento"&&(
+            <div style={{background:"#F0FDF4",borderRadius:10,padding:"12px 14px",display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#16A34A",textTransform:"uppercase",letterSpacing:"0.05em"}}>🎓 Detalhes do Treinamento</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div><label style={lbl}>Tipo</label>
+                  <select style={inp} value={form["Tipo Atividade"]} onChange={e=>set("Tipo Atividade",e.target.value)}>
+                    <option value="">—</option>
+                    {TIPO_ATIV.map(t=><option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div><label style={lbl}>Classificação</label>
+                  <select style={inp} value={form["Tipo Treinamento"]} onChange={e=>set("Tipo Treinamento",e.target.value)}>
+                    <option value="">—</option>
+                    {TIPO_TREIN.map(t=><option key={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div><label style={lbl}>Nome do Treinamento</label>
+                <input style={inp} value={form["Nome Treinamento"]} onChange={e=>set("Nome Treinamento",e.target.value)} placeholder="Ex: Safe City Solution 2.0"/>
+              </div>
+            </div>
+          )}
+
           <div><label style={lbl}>Status</label>
             <div style={{display:"flex",gap:8}}>
               {STATUS_LIST.map(s=>(
@@ -75,10 +158,7 @@ const Modal = ({entry,onSave,onClose,defaultQuarter}) => {
               ))}
             </div>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-            <div><label style={lbl}>Cliente Final</label><input style={inp} value={form["Cliente Final"]} onChange={e=>set("Cliente Final",e.target.value)} placeholder="Ex: Prefeitura Cubatão"/></div>
-            <div><label style={lbl}>Integrador</label><input style={inp} value={form.Integrador} onChange={e=>set("Integrador",e.target.value)} placeholder="Ex: ARC Soluções"/></div>
-          </div>
+
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
             <div><label style={lbl}>Quarter</label>
               <select style={inp} value={form.Quarter} onChange={e=>set("Quarter",e.target.value)}>{QUARTERS.map(q=><option key={q}>{q}</option>)}</select>
@@ -101,39 +181,134 @@ const Modal = ({entry,onSave,onClose,defaultQuarter}) => {
 };
 
 const KanbanView = ({activities}) => {
-  const cols = [
-    {label:"📋 Pre Vendas",items:activities.filter(a=>a.Categoria==="Pre Vendas"&&a.Status==="Em Andamento"),color:"#3B82F6"},
-    {label:"🔬 PoC",items:activities.filter(a=>a.Categoria==="PoC"&&a.Status==="Em Andamento"),color:"#F97316"},
-    {label:"🎓 Treinamento",items:activities.filter(a=>a.Categoria==="Treinamento"&&a.Status==="Em Andamento"),color:"#10B981"},
-    {label:"🤝 Reunião",items:activities.filter(a=>a.Categoria==="Reunião"&&a.Status==="Em Andamento"),color:"#8B5CF6"},
-    {label:"🛠️ Suporte",items:activities.filter(a=>a.Categoria==="Suporte"&&a.Status==="Em Andamento"),color:"#EAB308"},
-    {label:"🎯 Evento",items:activities.filter(a=>a.Categoria==="Evento"&&a.Status==="Em Andamento"),color:"#EC4899"},
-  ].filter(c=>c.items.length>0);
+  const cols = CATS.filter(c=>c!=="Closed Won").map(cat=>({
+    label:`${CAT_ICONS[cat]} ${cat}`,
+    items:activities.filter(a=>a.Categoria===cat&&a.Status==="Em Andamento"),
+    color:CAT_COLOR[cat]
+  })).filter(c=>c.items.length>0);
   return (
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:14}}>
       {cols.map(col=>(
         <div key={col.label}>
           <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
             <span style={{width:8,height:8,borderRadius:"50%",background:col.color,display:"inline-block"}}/>
-            <span style={{fontSize:12,fontWeight:700,color:"#475569",textTransform:"uppercase",letterSpacing:"0.05em"}}>{col.label}</span>
+            <span style={{fontSize:11,fontWeight:700,color:"#475569",textTransform:"uppercase",letterSpacing:"0.05em"}}>{col.label}</span>
             <span style={{marginLeft:"auto",background:"#F1F5F9",color:"#64748B",borderRadius:20,padding:"1px 8px",fontSize:11,fontWeight:700}}>{col.items.length}</span>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {col.items.map(a=>(
               <div key={a.id} style={{background:"#fff",borderRadius:11,padding:12,border:"1px solid #F1F5F9",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
                 <div style={{fontSize:12,fontWeight:700,color:"#0F172A",marginBottom:4}}>{a.Atividade||"—"}</div>
-                <div style={{fontSize:11,color:"#94A3B8",marginBottom:8}}>{a["Cliente Final"]||"—"}</div>
-                <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                <div style={{fontSize:11,color:"#94A3B8",marginBottom:6}}>{a["Cliente Final"]||"—"}</div>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>
+                  {a.Estado&&<Tag label={a.Estado} color={ESTADO_COLOR[a.Estado]||"#64748B"}/>}
                   {a.Etapa&&<Tag label={a.Etapa} color={ETAPA_COLOR[a.Etapa]||"#64748B"}/>}
-                  {a.Integrador&&<span style={{fontSize:10,color:"#64748B"}}>🤝 {a.Integrador}</span>}
                 </div>
-                {a.Data&&<div style={{fontSize:10,color:"#94A3B8",marginTop:6}}>📅 {new Date(a.Data+"T12:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})}</div>}
+                {a.Integrador&&<div style={{fontSize:10,color:"#64748B"}}>🤝 {a.Integrador}</div>}
               </div>
             ))}
           </div>
         </div>
       ))}
       {cols.length===0&&<div style={{gridColumn:"1/-1",padding:"48px",textAlign:"center",background:"#fff",borderRadius:13,border:"1px solid #F1F5F9",color:"#94A3B8",fontSize:13}}>Nenhuma atividade em andamento.</div>}
+    </div>
+  );
+};
+
+const RegionView = ({activities}) => {
+  const estadoData = ESTADOS.map(e=>({name:e,value:activities.filter(a=>a.Estado===e).length,fill:ESTADO_COLOR[e]})).filter(d=>d.value>0);
+  const regiaoData = REGIOES.map(r=>({name:r,value:activities.filter(a=>a.Região===r).length})).filter(d=>d.value>0);
+  const dsiData = DSI_OPTS.map(d=>({name:d,value:activities.filter(a=>a.DSI===d).length,fill:d==="Designed"?"#10B981":"#EF4444"})).filter(d=>d.value>0);
+
+  const treinByEstado = ESTADOS.map(e=>({
+    estado:e,
+    total:activities.filter(a=>a.Estado===e&&a.Categoria==="Treinamento").length,
+    designed:activities.filter(a=>a.Estado===e&&a.DSI==="Designed").length,
+    nonDesigned:activities.filter(a=>a.Estado===e&&a.DSI==="Non Designed").length,
+  })).filter(e=>e.total>0||e.designed>0);
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}}>
+        <div style={{background:"#fff",borderRadius:13,padding:"16px 18px",border:"1px solid #F1F5F9"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:14}}>Atividades por Estado</div>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={estadoData} margin={{left:-10,right:10}}>
+              <XAxis dataKey="name" tick={{fontSize:11,fill:"#475569"}}/>
+              <YAxis tick={{fontSize:10,fill:"#94A3B8"}} allowDecimals={false}/>
+              <Tooltip content={<Tip/>}/>
+              <Bar dataKey="value" name="Qtd" radius={[5,5,0,0]}>{estadoData.map((b,i)=><Cell key={i} fill={b.fill}/>)}</Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div style={{background:"#fff",borderRadius:13,padding:"16px 18px",border:"1px solid #F1F5F9"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:14}}>Sul vs Sudeste</div>
+          <ResponsiveContainer width="100%" height={180}>
+            <PieChart>
+              <Pie data={regiaoData} cx="50%" cy="45%" innerRadius={40} outerRadius={65} dataKey="value" paddingAngle={3}>
+                {regiaoData.map((p,i)=><Cell key={i} fill={["#3B82F6","#10B981","#8B5CF6"][i]}/>)}
+              </Pie>
+              <Tooltip content={<Tip/>}/>
+              <Legend iconType="circle" iconSize={7} formatter={v=><span style={{fontSize:10,color:"#475569"}}>{v}</span>}/>
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div style={{background:"#fff",borderRadius:13,padding:"16px 18px",border:"1px solid #F1F5F9"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:14}}>Designed vs Non Designed</div>
+          <ResponsiveContainer width="100%" height={180}>
+            <PieChart>
+              <Pie data={dsiData} cx="50%" cy="45%" innerRadius={40} outerRadius={65} dataKey="value" paddingAngle={3}>
+                {dsiData.map((p,i)=><Cell key={i} fill={p.fill}/>)}
+              </Pie>
+              <Tooltip content={<Tip/>}/>
+              <Legend iconType="circle" iconSize={7} formatter={v=><span style={{fontSize:10,color:"#475569"}}>{v}</span>}/>
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div style={{background:"#fff",borderRadius:13,border:"1px solid #F1F5F9",overflow:"hidden"}}>
+        <div style={{padding:"13px 18px",borderBottom:"1px solid #F8FAFC",fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em"}}>Cobertura por Estado</div>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr style={{background:"#F8FAFC"}}>
+            {["Estado","Região","Total Atividades","Treinamentos","Designed","Non Designed"].map(h=>(
+              <th key={h} style={{padding:"9px 14px",textAlign:"left",fontSize:11,fontWeight:700,color:"#94A3B8",textTransform:"uppercase"}}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {treinByEstado.map((r,i)=>{
+              const regiao = ["PR","RS","SC"].includes(r.estado)?"Sul":"Sudeste";
+              return (
+                <tr key={r.estado} style={{background:i%2===0?"#fff":"#FAFBFC"}}>
+                  <td style={{padding:"9px 14px"}}><Tag label={r.estado} color={ESTADO_COLOR[r.estado]||"#64748B"}/></td>
+                  <td style={{padding:"9px 14px",fontSize:12,color:"#475569"}}>{regiao}</td>
+                  <td style={{padding:"9px 14px",fontSize:15,fontWeight:800,color:"#6366F1"}}>{activities.filter(a=>a.Estado===r.estado).length}</td>
+                  <td style={{padding:"9px 14px",fontSize:13,fontWeight:700,color:"#10B981"}}>{r.total}</td>
+                  <td style={{padding:"9px 14px",fontSize:13,fontWeight:700,color:"#10B981"}}>{r.designed}</td>
+                  <td style={{padding:"9px 14px",fontSize:13,fontWeight:700,color:"#EF4444"}}>{r.nonDesigned}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{background:"#fff",borderRadius:13,border:"1px solid #F1F5F9",overflow:"hidden"}}>
+        <div style={{padding:"13px 18px",borderBottom:"1px solid #F8FAFC",fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em"}}>Treinamentos por Tipo</div>
+        <div style={{padding:"16px 18px",display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+          {TIPO_TREIN.map(tipo=>{
+            const n = activities.filter(a=>a["Tipo Treinamento"]===tipo).length;
+            const color = {"SBI":"#3B82F6","SBF":"#8B5CF6","SBC":"#F97316"}[tipo];
+            return (
+              <div key={tipo} style={{background:color+"11",borderRadius:10,padding:"14px 16px",border:`1px solid ${color}33`}}>
+                <div style={{fontSize:11,fontWeight:700,color,textTransform:"uppercase",marginBottom:6}}>{tipo}</div>
+                <div style={{fontSize:28,fontWeight:800,color}}>{n}</div>
+                <div style={{fontSize:11,color:"#94A3B8",marginTop:4}}>treinamentos</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 };
@@ -148,51 +323,46 @@ const ExecutiveView = ({activities,quarter}) => {
   const realizado = closedWon.reduce((s,a)=>s+(Number(a["Valor (R$)"])||0),0);
   const meta = closedWon.reduce((s,a)=>s+(Number(a["Meta Quarter (R$)"])||0),0);
   const atingimento = meta>0?Math.min((realizado/meta)*100,100):0;
-  const topClientes = Object.entries(activities.reduce((acc,a)=>{
-    if (a["Cliente Final"]) acc[a["Cliente Final"]]=(acc[a["Cliente Final"]]||0)+1;
-    return acc;
-  },{})).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const catData = CATS.filter(c=>c!=="Closed Won").map(c=>({name:c.replace(" ",""),value:activities.filter(a=>a.Categoria===c).length,fill:CAT_COLOR[c]})).filter(d=>d.value>0);
+  const topClientes = Object.entries(activities.reduce((acc,a)=>{if(a["Cliente Final"])acc[a["Cliente Final"]]=(acc[a["Cliente Final"]]||0)+1;return acc;},{})).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const catData = CATS.filter(c=>c!=="Closed Won").map(c=>({name:c.split(" ")[0],value:activities.filter(a=>a.Categoria===c).length,fill:CAT_COLOR[c]})).filter(d=>d.value>0);
+  const estadoData = ESTADOS.map(e=>({name:e,value:activities.filter(a=>a.Estado===e).length,fill:ESTADO_COLOR[e]})).filter(d=>d.value>0);
 
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
-      <div style={{background:"linear-gradient(135deg,#0F172A 0%,#1E293B 100%)",borderRadius:16,padding:"28px 32px",color:"#fff"}}>
-        <div style={{fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8}}>Relatório Executivo</div>
-        <div style={{fontSize:24,fontWeight:800,marginBottom:4}}>KPI Pre-Sales Gov — {quarter}</div>
-        <div style={{fontSize:13,color:"#94A3B8"}}>Hikvision Brazil · Sul & Sudeste · {new Date().toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}</div>
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{background:"linear-gradient(135deg,#0F172A 0%,#1E293B 100%)",borderRadius:16,padding:"24px 28px",color:"#fff"}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:6}}>Relatório Executivo</div>
+        <div style={{fontSize:22,fontWeight:800,marginBottom:4}}>KPI Pre-Sales Gov — {quarter}</div>
+        <div style={{fontSize:12,color:"#94A3B8"}}>Hikvision Brazil · Sul & Sudeste · {new Date().toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}</div>
       </div>
-
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
         {[
-          {label:"Total Atividades",value:total,color:"#6366F1",icon:"📁"},
+          {label:"Total",value:total,color:"#6366F1",icon:"📁"},
           {label:"Concluídas",value:`${concluidos} (${pct(concluidos)}%)`,color:"#10B981",icon:"✅"},
           {label:"Em Andamento",value:`${emAndamento} (${pct(emAndamento)}%)`,color:"#F97316",icon:"⏳"},
           {label:"Suspensas",value:`${suspensos} (${pct(suspensos)}%)`,color:"#EF4444",icon:"⛔"},
         ].map(k=>(
-          <div key={k.label} style={{background:"#fff",borderRadius:13,padding:"16px 18px",border:"1px solid #F1F5F9",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+          <div key={k.label} style={{background:"#fff",borderRadius:13,padding:"14px 16px",border:"1px solid #F1F5F9"}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
               <span style={{fontSize:11,fontWeight:700,color:"#94A3B8",textTransform:"uppercase"}}>{k.label}</span>
               <span style={{fontSize:16}}>{k.icon}</span>
             </div>
-            <div style={{fontSize:24,fontWeight:800,color:k.color}}>{k.value}</div>
+            <div style={{fontSize:22,fontWeight:800,color:k.color}}>{k.value}</div>
           </div>
         ))}
       </div>
-
-      <div style={{background:"#fff",borderRadius:13,padding:"20px 24px",border:"1px solid #FEE2E2"}}>
-        <div style={{fontSize:13,fontWeight:700,color:"#0F172A",marginBottom:14}}>🏆 Closed Won — Atingimento de Meta</div>
-        <div style={{display:"flex",gap:32,marginBottom:14}}>
-          <div><div style={{fontSize:11,color:"#94A3B8"}}>Realizado</div><div style={{fontSize:26,fontWeight:800,color:"#EF4444"}}>{fmt(realizado)}</div></div>
-          <div><div style={{fontSize:11,color:"#94A3B8"}}>Meta</div><div style={{fontSize:26,fontWeight:800,color:"#475569"}}>{meta>0?fmt(meta):"Não definida"}</div></div>
-          <div><div style={{fontSize:11,color:"#94A3B8"}}>Atingimento</div><div style={{fontSize:26,fontWeight:800,color:atingimento>=100?"#10B981":atingimento>=70?"#EAB308":"#EF4444"}}>{meta>0?`${atingimento.toFixed(0)}%`:"—"}</div></div>
+      <div style={{background:"#fff",borderRadius:13,padding:"16px 20px",border:"1px solid #FEE2E2"}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#0F172A",marginBottom:12}}>🏆 Closed Won — Atingimento de Meta</div>
+        <div style={{display:"flex",gap:28,marginBottom:12}}>
+          <div><div style={{fontSize:11,color:"#94A3B8"}}>Realizado</div><div style={{fontSize:22,fontWeight:800,color:"#EF4444"}}>{fmt(realizado)}</div></div>
+          <div><div style={{fontSize:11,color:"#94A3B8"}}>Meta</div><div style={{fontSize:22,fontWeight:800,color:"#475569"}}>{meta>0?fmt(meta):"Não definida"}</div></div>
+          <div><div style={{fontSize:11,color:"#94A3B8"}}>Atingimento</div><div style={{fontSize:22,fontWeight:800,color:atingimento>=100?"#10B981":atingimento>=70?"#EAB308":"#EF4444"}}>{meta>0?`${atingimento.toFixed(0)}%`:"—"}</div></div>
         </div>
-        {meta>0&&<div style={{background:"#F1F5F9",borderRadius:8,height:10,overflow:"hidden"}}><div style={{height:"100%",width:`${atingimento}%`,background:atingimento>=100?"#10B981":atingimento>=70?"#EAB308":"#EF4444",borderRadius:8,transition:"width 0.6s"}}/></div>}
+        {meta>0&&<div style={{background:"#F1F5F9",borderRadius:8,height:8,overflow:"hidden"}}><div style={{height:"100%",width:`${atingimento}%`,background:atingimento>=100?"#10B981":atingimento>=70?"#EAB308":"#EF4444",borderRadius:8}}/></div>}
       </div>
-
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <div style={{background:"#fff",borderRadius:13,padding:"18px 20px",border:"1px solid #F1F5F9"}}>
-          <div style={{fontSize:12,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:14}}>Distribuição por Categoria</div>
-          <ResponsiveContainer width="100%" height={200}>
+        <div style={{background:"#fff",borderRadius:13,padding:"16px 18px",border:"1px solid #F1F5F9"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:14}}>Por Categoria</div>
+          <ResponsiveContainer width="100%" height={180}>
             <BarChart data={catData} margin={{left:-10,right:10}}>
               <XAxis dataKey="name" tick={{fontSize:10,fill:"#475569"}}/>
               <YAxis tick={{fontSize:10,fill:"#94A3B8"}} allowDecimals={false}/>
@@ -201,39 +371,30 @@ const ExecutiveView = ({activities,quarter}) => {
             </BarChart>
           </ResponsiveContainer>
         </div>
-
-        <div style={{background:"#fff",borderRadius:13,padding:"18px 20px",border:"1px solid #F1F5F9"}}>
-          <div style={{fontSize:12,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:14}}>Top 5 Clientes</div>
-          {topClientes.length===0?<div style={{color:"#94A3B8",fontSize:13}}>Sem dados</div>:
-            topClientes.map(([cliente,n],i)=>(
-              <div key={cliente} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-                <div style={{width:22,height:22,borderRadius:6,background:["#6366F1","#3B82F6","#10B981","#F97316","#EC4899"][i],display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#fff",flexShrink:0}}>{i+1}</div>
-                <div style={{flex:1,fontSize:12,color:"#0F172A",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cliente}</div>
-                <div style={{fontSize:12,fontWeight:800,color:"#475569"}}>{n}</div>
-                <div style={{width:60,background:"#F1F5F9",borderRadius:4,height:6,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${(n/topClientes[0][1])*100}%`,background:"#6366F1",borderRadius:4}}/>
-                </div>
-              </div>
-            ))
-          }
+        <div style={{background:"#fff",borderRadius:13,padding:"16px 18px",border:"1px solid #F1F5F9"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:14}}>Por Estado</div>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={estadoData} margin={{left:-10,right:10}}>
+              <XAxis dataKey="name" tick={{fontSize:10,fill:"#475569"}}/>
+              <YAxis tick={{fontSize:10,fill:"#94A3B8"}} allowDecimals={false}/>
+              <Tooltip content={<Tip/>}/>
+              <Bar dataKey="value" name="Qtd" radius={[5,5,0,0]}>{estadoData.map((b,i)=><Cell key={i} fill={b.fill}/>)}</Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
-
-      <div style={{background:"#fff",borderRadius:13,padding:"18px 20px",border:"1px solid #F1F5F9"}}>
-        <div style={{fontSize:12,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:14}}>Pre Vendas por Etapa</div>
-        <div style={{display:"flex",gap:16}}>
-          {ETAPAS.map(etapa=>{
-            const n = activities.filter(a=>a.Categoria==="Pre Vendas"&&a.Etapa===etapa).length;
-            const conc = activities.filter(a=>a.Categoria==="Pre Vendas"&&a.Etapa===etapa&&a.Status==="Concluído").length;
-            return (
-              <div key={etapa} style={{flex:1,background:ETAPA_COLOR[etapa]+"11",borderRadius:10,padding:"14px 16px",border:`1px solid ${ETAPA_COLOR[etapa]}33`}}>
-                <div style={{fontSize:11,fontWeight:700,color:ETAPA_COLOR[etapa],textTransform:"uppercase",marginBottom:6}}>{etapa}</div>
-                <div style={{fontSize:28,fontWeight:800,color:ETAPA_COLOR[etapa]}}>{n}</div>
-                <div style={{fontSize:11,color:"#94A3B8",marginTop:4}}>{conc} concluídos</div>
-              </div>
-            );
-          })}
-        </div>
+      <div style={{background:"#fff",borderRadius:13,padding:"16px 18px",border:"1px solid #F1F5F9"}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:14}}>Top 5 Clientes</div>
+        {topClientes.map(([cliente,n],i)=>(
+          <div key={cliente} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+            <div style={{width:22,height:22,borderRadius:6,background:["#6366F1","#3B82F6","#10B981","#F97316","#EC4899"][i],display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#fff",flexShrink:0}}>{i+1}</div>
+            <div style={{flex:1,fontSize:12,color:"#0F172A",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cliente}</div>
+            <div style={{fontSize:12,fontWeight:800,color:"#475569"}}>{n}</div>
+            <div style={{width:60,background:"#F1F5F9",borderRadius:4,height:6,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${(n/topClientes[0][1])*100}%`,background:"#6366F1",borderRadius:4}}/>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -249,29 +410,28 @@ export default function App() {
   const [filterCat,setFilterCat] = useState("Todas");
   const [filterStatus,setFilterStatus] = useState("Todos");
   const [filterEtapa,setFilterEtapa] = useState("Todas");
+  const [filterEstado,setFilterEstado] = useState("Todos");
+  const [filterDSI,setFilterDSI] = useState("Todos");
   const [sortBy,setSortBy] = useState("data-desc");
   const [toast,setToast] = useState("");
 
   const showToast = msg => { setToast(msg); setTimeout(()=>setToast(""),2800); };
-
-  const sync = useCallback(async () => {
+  const sync = useCallback(async()=>{
     setSyncing(true);
-    try { const d = await loadActivities(quarter); setActivities(d); showToast(`✓ ${d.length} atividades`); }
+    try { const d=await loadActivities(quarter); setActivities(d); showToast(`✓ ${d.length} atividades`); }
     catch(e) { showToast("⚠️ "+e.message); }
     setSyncing(false);
   },[quarter]);
-
   useEffect(()=>{ sync(); },[sync]);
 
   const handleSave = async form => {
     setLoading(true); setModal(null);
     try {
-      if (form.id) { const u = await updateActivity(form.id,form); setActivities(p=>p.map(a=>a.id===form.id?u:a)); showToast("✓ Atualizado"); }
-      else { const c = await createActivity(form); setActivities(p=>[c,...p]); showToast("✓ Salvo"); }
+      if (form.id) { const u=await updateActivity(form.id,form); setActivities(p=>p.map(a=>a.id===form.id?u:a)); showToast("✓ Atualizado"); }
+      else { const c=await createActivity(form); setActivities(p=>[c,...p]); showToast("✓ Salvo"); }
     } catch(e) { showToast("⚠️ "+e.message); }
     setLoading(false);
   };
-
   const handleDelete = async id => {
     if (!confirm("Excluir?")) return;
     setLoading(true);
@@ -290,7 +450,7 @@ export default function App() {
   const kpis = [
     {cat:"Pre Vendas",count:byCount("Pre Vendas"),sub:`BOM: ${preVendas.filter(a=>a.Etapa==="BOM").length} · Spec-In: ${preVendas.filter(a=>a.Etapa==="Spec-In").length} · BID: ${preVendas.filter(a=>a.Etapa==="BID").length}`},
     {cat:"PoC",count:byCount("PoC"),sub:`Em Andamento: ${activities.filter(a=>a.Categoria==="PoC"&&a.Status==="Em Andamento").length} · Concluído: ${activities.filter(a=>a.Categoria==="PoC"&&a.Status==="Concluído").length}`},
-    {cat:"Treinamento",count:byCount("Treinamento"),sub:"realizados no quarter"},
+    {cat:"Treinamento",count:byCount("Treinamento"),sub:`SBI: ${activities.filter(a=>a["Tipo Treinamento"]==="SBI").length} · SBF: ${activities.filter(a=>a["Tipo Treinamento"]==="SBF").length} · SBC: ${activities.filter(a=>a["Tipo Treinamento"]==="SBC").length}`},
     {cat:"Reunião",count:byCount("Reunião"),sub:"reuniões registradas"},
     {cat:"Suporte",count:byCount("Suporte"),sub:"atendimentos"},
     {cat:"Evento",count:byCount("Evento"),sub:"eventos participados"},
@@ -299,7 +459,6 @@ export default function App() {
   const barData = CATS.filter(c=>c!=="Closed Won").map(c=>({name:c.split(" ")[0],value:activities.filter(a=>a.Categoria===c).length,fill:CAT_COLOR[c]}));
   const pieStatus = STATUS_LIST.map(s=>({name:s,value:activities.filter(a=>a.Status===s).length,fill:STATUS_COLOR[s]})).filter(d=>d.value>0);
   const pieEtapa = ETAPAS.map(e=>({name:e,value:preVendas.filter(a=>a.Etapa===e).length,fill:ETAPA_COLOR[e]})).filter(d=>d.value>0);
-
   const weekMap={};
   activities.forEach(a=>{
     if (!a.Data) return;
@@ -308,7 +467,6 @@ export default function App() {
     weekMap[w]=(weekMap[w]||0)+1;
   });
   const trendData=Object.entries(weekMap).slice(-8).map(([w,v])=>({semana:w,atividades:v}));
-
   const summaryData=CATS.map(cat=>{
     const rows=activities.filter(a=>a.Categoria===cat);
     const statuses=[...new Set(rows.map(a=>a.Status))].filter(Boolean);
@@ -320,6 +478,8 @@ export default function App() {
   if (filterCat!=="Todas") filtered=filtered.filter(a=>a.Categoria===filterCat);
   if (filterStatus!=="Todos") filtered=filtered.filter(a=>a.Status===filterStatus);
   if (filterEtapa!=="Todas") filtered=filtered.filter(a=>a.Etapa===filterEtapa);
+  if (filterEstado!=="Todos") filtered=filtered.filter(a=>a.Estado===filterEstado);
+  if (filterDSI!=="Todos") filtered=filtered.filter(a=>a.DSI===filterDSI);
   filtered.sort((a,b)=>{
     if (sortBy==="data-desc") return new Date(b.Data||0)-new Date(a.Data||0);
     if (sortBy==="data-asc") return new Date(a.Data||0)-new Date(b.Data||0);
@@ -327,7 +487,7 @@ export default function App() {
   });
 
   const sel={padding:"7px 12px",borderRadius:8,border:"1px solid #E2E8F0",background:"#fff",fontSize:12,color:"#475569",outline:"none",cursor:"pointer"};
-  const btnTab=(t,label)=><button onClick={()=>setTab(t)} style={{padding:"8px 16px",borderRadius:8,border:"none",background:tab===t?"#1E293B":"transparent",color:tab===t?"#fff":"#64748B",cursor:"pointer",fontSize:13,fontWeight:700}}>{label}</button>;
+  const btnTab=(t,label)=><button onClick={()=>setTab(t)} style={{padding:"7px 14px",borderRadius:8,border:"none",background:tab===t?"#1E293B":"transparent",color:tab===t?"#fff":"#64748B",cursor:"pointer",fontSize:12,fontWeight:700}}>{label}</button>;
 
   return (
     <div style={{minHeight:"100vh",background:"#F8FAFC"}}>
@@ -344,6 +504,7 @@ export default function App() {
             <div style={{display:"flex",background:"#1E293B",borderRadius:10,padding:3,gap:1}}>
               {btnTab("dashboard","📊 Dashboard")}
               {btnTab("kanban","📌 Kanban")}
+              {btnTab("regioes","🗺️ Regiões")}
               {btnTab("executive","📈 Executivo")}
               {btnTab("log","📋 Log")}
             </div>
@@ -381,7 +542,7 @@ export default function App() {
                 <div><div style={{fontSize:11,color:"#94A3B8"}}>Atingimento</div><div style={{fontSize:22,fontWeight:800,color:pctMeta>=100?"#10B981":pctMeta>=70?"#EAB308":"#EF4444"}}>{metaQuarter>0?`${pctMeta.toFixed(0)}%`:"—"}</div></div>
                 <div><div style={{fontSize:11,color:"#94A3B8"}}>Negócios</div><div style={{fontSize:22,fontWeight:800,color:"#475569"}}>{closedWon.length}</div></div>
               </div>
-              {metaQuarter>0&&<div style={{background:"#F1F5F9",borderRadius:8,height:8,overflow:"hidden"}}><div style={{height:"100%",width:`${pctMeta}%`,background:pctMeta>=100?"#10B981":pctMeta>=70?"#EAB308":"#EF4444",borderRadius:8,transition:"width 0.6s"}}/></div>}
+              {metaQuarter>0&&<div style={{background:"#F1F5F9",borderRadius:8,height:8,overflow:"hidden"}}><div style={{height:"100%",width:`${pctMeta}%`,background:pctMeta>=100?"#10B981":pctMeta>=70?"#EAB308":"#EF4444",borderRadius:8}}/></div>}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1.3fr 1fr 1fr",gap:14,marginBottom:14}}>
               <div style={{background:"#fff",borderRadius:13,padding:"16px 18px",border:"1px solid #F1F5F9"}}>
@@ -460,14 +621,17 @@ export default function App() {
         )}
 
         {tab==="kanban"&&<KanbanView activities={activities}/>}
+        {tab==="regioes"&&<RegionView activities={activities}/>}
         {tab==="executive"&&<ExecutiveView activities={activities} quarter={quarter}/>}
 
         {tab==="log"&&(
           <>
-            <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+            <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
               <select style={sel} value={filterCat} onChange={e=>setFilterCat(e.target.value)}><option>Todas</option>{CATS.map(c=><option key={c}>{c}</option>)}</select>
               <select style={sel} value={filterEtapa} onChange={e=>setFilterEtapa(e.target.value)}><option>Todas</option>{ETAPAS.map(e=><option key={e}>{e}</option>)}</select>
               <select style={sel} value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}><option>Todos</option>{STATUS_LIST.map(s=><option key={s}>{s}</option>)}</select>
+              <select style={sel} value={filterEstado} onChange={e=>setFilterEstado(e.target.value)}><option>Todos</option>{ESTADOS.map(e=><option key={e}>{e}</option>)}</select>
+              <select style={sel} value={filterDSI} onChange={e=>setFilterDSI(e.target.value)}><option>Todos</option>{DSI_OPTS.map(d=><option key={d}>{d}</option>)}</select>
               <select style={sel} value={sortBy} onChange={e=>setSortBy(e.target.value)}>
                 <option value="data-desc">Data ↓</option>
                 <option value="data-asc">Data ↑</option>
@@ -480,8 +644,8 @@ export default function App() {
               {filtered.length===0?<div style={{padding:"48px",textAlign:"center",fontSize:13,color:"#94A3B8"}}>Nenhuma atividade encontrada.</div>:(
                 <table style={{width:"100%",borderCollapse:"collapse"}}>
                   <thead><tr style={{background:"#F8FAFC"}}>
-                    {["Atividade","Categoria","Etapa","Status","Cliente Final","Integrador","Data","Valor",""].map(h=>(
-                      <th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:11,fontWeight:700,color:"#94A3B8",textTransform:"uppercase"}}>{h}</th>
+                    {["Cliente Final","Integrador","Categoria","Etapa","Status","Estado","DSI","Data",""].map(h=>(
+                      <th key={h} style={{padding:"10px 12px",textAlign:"left",fontSize:11,fontWeight:700,color:"#94A3B8",textTransform:"uppercase"}}>{h}</th>
                     ))}
                   </tr></thead>
                   <tbody>
@@ -489,15 +653,15 @@ export default function App() {
                       <tr key={a.id} style={{background:i%2===0?"#fff":"#FAFBFC"}}
                         onMouseEnter={e=>e.currentTarget.style.background="#F0F9FF"}
                         onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"#fff":"#FAFBFC"}>
-                        <td style={{padding:"10px 14px",fontSize:13,fontWeight:600,color:"#0F172A",maxWidth:180}}><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.Atividade||"—"}</div></td>
-                        <td style={{padding:"10px 14px"}}><Tag label={`${CAT_ICONS[a.Categoria]||""} ${a.Categoria}`} color={CAT_COLOR[a.Categoria]||"#64748B"}/></td>
-                        <td style={{padding:"10px 14px"}}>{a.Etapa?<Tag label={a.Etapa} color={ETAPA_COLOR[a.Etapa]||"#64748B"}/>:<span style={{fontSize:11,color:"#CBD5E1"}}>—</span>}</td>
-                        <td style={{padding:"10px 14px"}}><Tag label={a.Status||"—"} color={STATUS_COLOR[a.Status]||"#64748B"}/></td>
-                        <td style={{padding:"10px 14px",fontSize:12,color:"#475569"}}>{a["Cliente Final"]||"—"}</td>
-                        <td style={{padding:"10px 14px",fontSize:12,color:"#475569"}}>{a.Integrador||"—"}</td>
-                        <td style={{padding:"10px 14px",fontSize:12,color:"#94A3B8"}}>{a.Data?new Date(a.Data+"T12:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"}):"—"}</td>
-                        <td style={{padding:"10px 14px",fontSize:12,fontWeight:600,color:"#475569"}}>{fmt(a["Valor (R$)"])}</td>
-                        <td style={{padding:"10px 14px"}}>
+                        <td style={{padding:"10px 12px",fontSize:12,fontWeight:600,color:"#0F172A",maxWidth:160}}><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a["Cliente Final"]||a.Atividade||"—"}</div></td>
+                        <td style={{padding:"10px 12px",fontSize:12,color:"#475569"}}>{a.Integrador||"—"}</td>
+                        <td style={{padding:"10px 12px"}}><Tag label={`${CAT_ICONS[a.Categoria]||""} ${a.Categoria}`} color={CAT_COLOR[a.Categoria]||"#64748B"}/></td>
+                        <td style={{padding:"10px 12px"}}>{a.Etapa?<Tag label={a.Etapa} color={ETAPA_COLOR[a.Etapa]||"#64748B"}/>:<span style={{fontSize:11,color:"#CBD5E1"}}>—</span>}</td>
+                        <td style={{padding:"10px 12px"}}><Tag label={a.Status||"—"} color={STATUS_COLOR[a.Status]||"#64748B"}/></td>
+                        <td style={{padding:"10px 12px"}}>{a.Estado?<Tag label={a.Estado} color={ESTADO_COLOR[a.Estado]||"#64748B"}/>:<span style={{fontSize:11,color:"#CBD5E1"}}>—</span>}</td>
+                        <td style={{padding:"10px 12px"}}>{a.DSI?<Tag label={a.DSI} color={a.DSI==="Designed"?"#10B981":"#EF4444"}/>:<span style={{fontSize:11,color:"#CBD5E1"}}>—</span>}</td>
+                        <td style={{padding:"10px 12px",fontSize:12,color:"#94A3B8"}}>{a.Data?new Date(a.Data+"T12:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"}):"—"}</td>
+                        <td style={{padding:"10px 12px"}}>
                           <div style={{display:"flex",gap:5}}>
                             <button onClick={()=>setModal({entry:a})} style={{padding:"4px 9px",borderRadius:6,border:"1px solid #E2E8F0",background:"#fff",color:"#475569",cursor:"pointer",fontSize:11}}>✏️</button>
                             <button onClick={()=>handleDelete(a.id)} style={{padding:"4px 9px",borderRadius:6,border:"1px solid #FEE2E2",background:"#fff",color:"#EF4444",cursor:"pointer",fontSize:11}}>🗑</button>
