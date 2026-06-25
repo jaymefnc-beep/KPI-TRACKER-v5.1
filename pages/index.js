@@ -244,14 +244,24 @@ const RegionView = ({activities}) => {
 
   const filteredAll = regionQuarter === "Todos" ? activities : activities.filter(a => a.Quarter === regionQuarter);
 
-  const fmtQ = q => q ? q.replace("20","").replace(" ","") : "";
+  const fmtQ = q => q ? q.replace("2025","25").replace("2026","26").replace(" ","") : "";
+
+  // Map column name to keywords to search in Atividade or Nome Treinamento
+  const TREIN_KEYWORDS = {
+    "Safe City Solution 2.0": ["safe city solution","safe city sol"],
+    "Safe State 2.0": ["safe state"],
+    "Mobile Enforcement 2.0": ["mobile enforcement","mobile enf"],
+    "Guanlan Large Scale": ["guanlan","large scale"],
+  };
 
   const getTreinQ = (integrador, treinNome) => {
-    const keywords = treinNome.toLowerCase().split(" ").slice(0,2).join(" ");
-    const match = filteredTrein.find(a =>
-      a.Integrador === integrador &&
-      (a["Nome Treinamento"] || "").toLowerCase().includes(keywords)
-    );
+    const keywords = TREIN_KEYWORDS[treinNome] || [treinNome.toLowerCase()];
+    const match = filteredTrein.find(a => {
+      if (a.Integrador !== integrador) return false;
+      const ativ = (a.Atividade || "").toLowerCase();
+      const nomeTrein = (a["Nome Treinamento"] || "").toLowerCase();
+      return keywords.some(kw => ativ.includes(kw) || nomeTrein.includes(kw));
+    });
     return match ? fmtQ(match.Quarter) : "";
   };
 
