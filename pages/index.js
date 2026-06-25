@@ -146,7 +146,8 @@ const Modal = ({entry,onSave,onClose,defaultQuarter}) => {
                 </div>
               </div>
               <div><label style={lbl}>Nome do Treinamento</label>
-                <input style={inp} value={form["Nome Treinamento"]} onChange={e=>set("Nome Treinamento",e.target.value)} placeholder="Ex: Safe City Solution 2.0"/>
+                <input style={inp} value={form["Nome Treinamento"]} onChange={e=>set("Nome Treinamento",e.target.value)} placeholder="Ex: Civil Defense SBF, Prison SBI..."/>
+                <div style={{fontSize:10,color:"#94A3B8",marginTop:4}}>💡 Para treinamentos fora dos 4 padrões, deixe o Treinamento ID vazio e preencha aqui — aparecerá na coluna "Outros"</div>
               </div>
             </div>
           )}
@@ -270,6 +271,17 @@ const RegionView = ({activities}) => {
 
   const thStyle = {padding:"9px 10px",textAlign:"center",fontSize:10,fontWeight:700,color:"#94A3B8",textTransform:"uppercase",background:"#F8FAFC",borderRight:"1px solid #F1F5F9",whiteSpace:"nowrap"};
 
+  // Get "Outros" treinamentos for an integrador (no Treinamento ID, but has Nome Treinamento)
+  const getOutros = (integrador) => {
+    const outros = filteredTrein.filter(a =>
+      a.Integrador === integrador &&
+      !a["Treinamento ID"] &&
+      a["Nome Treinamento"]
+    );
+    if (outros.length === 0) return "";
+    return outros.map(a => `${a["Nome Treinamento"]} (${fmtQ(a.Quarter)})`).join(", ");
+  };
+
   const renderTable = (dsiType) => {
     const rows = [];
     if (dsiType === "Designed") {
@@ -308,24 +320,31 @@ const RegionView = ({activities}) => {
                   {t.replace(" 2.0","").replace(" Large Scale","")}
                 </th>
               ))}
+              <th style={{...thStyle,textAlign:"left",minWidth:160}}>Outros</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row,i)=>(
-              <tr key={i} style={{borderBottom:"1px solid #F1F5F9"}}>
-                <td style={{padding:"8px 10px",fontSize:12,fontWeight:600,background:i%2===0?"#fff":"#FAFBFC",borderRight:"1px solid #F1F5F9"}}>
-                  <Tag label={row.regiao} color={row.regiao==="Sul"?"#3B82F6":"#10B981"}/>
-                </td>
-                <td style={{padding:"8px 10px",background:i%2===0?"#fff":"#FAFBFC",borderRight:"1px solid #F1F5F9"}}>
-                  <Tag label={row.estado} color={ESTADO_COLOR[row.estado]||"#64748B"}/>
-                </td>
-                <td style={{padding:"8px 10px",fontSize:12,fontWeight:600,color:"#0F172A",background:i%2===0?"#fff":"#FAFBFC",borderRight:"1px solid #F1F5F9"}}>{row.integrador}</td>
-                {TREINAMENTOS_COLS.map(t=>{
-                  const val = getTreinQ(row.integrador, t);
-                  return <td key={t} style={cellStyle(val)}>{val||"—"}</td>;
-                })}
-              </tr>
-            ))}
+            {rows.map((row,i)=>{
+              const outros = getOutros(row.integrador);
+              return (
+                <tr key={i} style={{borderBottom:"1px solid #F1F5F9"}}>
+                  <td style={{padding:"8px 10px",fontSize:12,fontWeight:600,background:i%2===0?"#fff":"#FAFBFC",borderRight:"1px solid #F1F5F9"}}>
+                    <Tag label={row.regiao} color={row.regiao==="Sul"?"#3B82F6":"#10B981"}/>
+                  </td>
+                  <td style={{padding:"8px 10px",background:i%2===0?"#fff":"#FAFBFC",borderRight:"1px solid #F1F5F9"}}>
+                    <Tag label={row.estado} color={ESTADO_COLOR[row.estado]||"#64748B"}/>
+                  </td>
+                  <td style={{padding:"8px 10px",fontSize:12,fontWeight:600,color:"#0F172A",background:i%2===0?"#fff":"#FAFBFC",borderRight:"1px solid #F1F5F9"}}>{row.integrador}</td>
+                  {TREINAMENTOS_COLS.map(t=>{
+                    const val = getTreinQ(row.integrador, t);
+                    return <td key={t} style={cellStyle(val)}>{val||"—"}</td>;
+                  })}
+                  <td style={{padding:"8px 10px",fontSize:11,color:outros?"#475569":"#CBD5E1",background:i%2===0?"#fff":"#FAFBFC",maxWidth:200}}>
+                    {outros||"—"}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
