@@ -215,24 +215,141 @@ const KanbanView = ({activities}) => {
   );
 };
 
-const RegionView = ({activities}) => {
-  const estadoData = ESTADOS.map(e=>({name:e,value:activities.filter(a=>a.Estado===e).length,fill:ESTADO_COLOR[e]})).filter(d=>d.value>0);
-  const regiaoData = REGIOES.map(r=>({name:r,value:activities.filter(a=>a.Região===r).length})).filter(d=>d.value>0);
-  const dsiData = DSI_OPTS.map(d=>({name:d,value:activities.filter(a=>a.DSI===d).length,fill:d==="Designed"?"#10B981":"#EF4444"})).filter(d=>d.value>0);
+const TREINAMENTOS_COLS = [
+  "Safe City Solution 2.0",
+  "Safe State 2.0",
+  "Mobile Enforcement 2.0",
+  "Guanlan Large Scale",
+];
 
-  const treinByEstado = ESTADOS.map(e=>({
-    estado:e,
-    total:activities.filter(a=>a.Estado===e&&a.Categoria==="Treinamento").length,
-    designed:activities.filter(a=>a.Estado===e&&a.DSI==="Designed").length,
-    nonDesigned:activities.filter(a=>a.Estado===e&&a.DSI==="Non Designed").length,
-  })).filter(e=>e.total>0||e.designed>0);
+const INTEGRADORES_DESIGNED = {
+  Sul: {
+    PR: ["Intersept","L8","Teletex"],
+    RS: ["Vigillare"],
+    SC: ["Khronos","Xpti","Mopen"],
+  },
+  Sudeste: {
+    SP: ["Flama","ARC","Grupo Painel","Alerta"],
+    MG: ["Emive","Método"],
+    RJ: ["Multiviz","RealSeg","7LAN","WP"],
+  },
+};
+
+const RegionView = ({activities}) => {
+  const [regionQuarter, setRegionQuarter] = useState("Todos");
+
+  const filteredTrein = regionQuarter === "Todos"
+    ? activities.filter(a => a.Categoria === "Treinamento")
+    : activities.filter(a => a.Categoria === "Treinamento" && a.Quarter === regionQuarter);
+
+  const filteredAll = regionQuarter === "Todos" ? activities : activities.filter(a => a.Quarter === regionQuarter);
+
+  const fmtQ = q => q ? q.replace("20","").replace(" ","") : "";
+
+  const getTreinQ = (integrador, treinNome) => {
+    const keywords = treinNome.toLowerCase().split(" ").slice(0,2).join(" ");
+    const match = filteredTrein.find(a =>
+      a.Integrador === integrador &&
+      (a["Nome Treinamento"] || "").toLowerCase().includes(keywords)
+    );
+    return match ? fmtQ(match.Quarter) : "";
+  };
+
+  const estadoData = ESTADOS.map(e=>({name:e,value:filteredAll.filter(a=>a.Estado===e).length,fill:ESTADO_COLOR[e]})).filter(d=>d.value>0);
+  const regiaoData = REGIOES.map(r=>({name:r,value:filteredAll.filter(a=>a.Região===r).length})).filter(d=>d.value>0);
+  const dsiData = [
+    {name:"Designed",value:filteredTrein.filter(a=>a.DSI==="Designed").length,fill:"#10B981"},
+    {name:"Non Designed",value:filteredTrein.filter(a=>a.DSI==="Non Designed").length,fill:"#EF4444"},
+  ].filter(d=>d.value>0);
+
+  const cellStyle = val => ({
+    padding:"8px 10px", fontSize:11, textAlign:"center",
+    background: val ? "#ECFDF5" : "#F8FAFC",
+    color: val ? "#065F46" : "#CBD5E1",
+    fontWeight: val ? 700 : 400,
+    borderRight:"1px solid #F1F5F9",
+  });
+
+  const thStyle = {padding:"9px 10px",textAlign:"center",fontSize:10,fontWeight:700,color:"#94A3B8",textTransform:"uppercase",background:"#F8FAFC",borderRight:"1px solid #F1F5F9",whiteSpace:"nowrap"};
+
+  const renderTable = (dsiType) => {
+    const rows = [];
+    if (dsiType === "Designed") {
+      Object.entries(INTEGRADORES_DESIGNED).forEach(([regiao, estados]) => {
+        Object.entries(estados).forEach(([estado, integradores]) => {
+          integradores.forEach(integrador => {
+            rows.push({regiao, estado, integrador});
+          });
+        });
+      });
+    } else {
+      const seen = new Set();
+      filteredTrein.filter(a=>a.DSI==="Non Designed").forEach(a => {
+        const key = `${a.Região}|${a.Estado}|${a.Integrador}`;
+        if (!seen.has(key) && a.Integrador) {
+          seen.add(key);
+          rows.push({regiao:a.Região||"—",estado:a.Estado||"—",integrador:a.Integrador});
+        }
+      });
+    }
+
+    if (rows.length === 0) return (
+      <div style={{padding:"24px",textAlign:"center",color:"#94A3B8",fontSize:13}}>Nenhum treinamento registrado.</div>
+    );
+
+    return (
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+          <thead>
+            <tr style={{background:"#F8FAFC"}}>
+              <th style={{...thStyle,textAlign:"left",minWidth:80}}>Região</th>
+              <th style={{...thStyle,textAlign:"left",minWidth:60}}>Estado</th>
+              <th style={{...thStyle,textAlign:"left",minWidth:120}}>Integrador</th>
+              {TREINAMENTOS_COLS.map(t=>(
+                <th key={t} style={{...thStyle,maxWidth:110}}>
+                  {t.replace(" 2.0","").replace(" Large Scale","")}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row,i)=>(
+              <tr key={i} style={{borderBottom:"1px solid #F1F5F9"}}>
+                <td style={{padding:"8px 10px",fontSize:12,fontWeight:600,background:i%2===0?"#fff":"#FAFBFC",borderRight:"1px solid #F1F5F9"}}>
+                  <Tag label={row.regiao} color={row.regiao==="Sul"?"#3B82F6":"#10B981"}/>
+                </td>
+                <td style={{padding:"8px 10px",background:i%2===0?"#fff":"#FAFBFC",borderRight:"1px solid #F1F5F9"}}>
+                  <Tag label={row.estado} color={ESTADO_COLOR[row.estado]||"#64748B"}/>
+                </td>
+                <td style={{padding:"8px 10px",fontSize:12,fontWeight:600,color:"#0F172A",background:i%2===0?"#fff":"#FAFBFC",borderRight:"1px solid #F1F5F9"}}>{row.integrador}</td>
+                {TREINAMENTOS_COLS.map(t=>{
+                  const val = getTreinQ(row.integrador, t);
+                  return <td key={t} style={cellStyle(val)}>{val||"—"}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+        <span style={{fontSize:12,fontWeight:700,color:"#64748B"}}>Período:</span>
+        {["Todos",...QUARTERS].map(q=>(
+          <button key={q} onClick={()=>setRegionQuarter(q)}
+            style={{padding:"4px 12px",borderRadius:20,border:"1px solid",borderColor:regionQuarter===q?"#1E293B":"#E2E8F0",background:regionQuarter===q?"#1E293B":"#fff",color:regionQuarter===q?"#fff":"#64748B",cursor:"pointer",fontSize:11,fontWeight:600}}>
+            {q}
+          </button>
+        ))}
+      </div>
+
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}}>
         <div style={{background:"#fff",borderRadius:13,padding:"16px 18px",border:"1px solid #F1F5F9"}}>
           <div style={{fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:14}}>Atividades por Estado</div>
-          <ResponsiveContainer width="100%" height={180}>
+          <ResponsiveContainer width="100%" height={160}>
             <BarChart data={estadoData} margin={{left:-10,right:10}}>
               <XAxis dataKey="name" tick={{fontSize:11,fill:"#475569"}}/>
               <YAxis tick={{fontSize:10,fill:"#94A3B8"}} allowDecimals={false}/>
@@ -243,63 +360,51 @@ const RegionView = ({activities}) => {
         </div>
         <div style={{background:"#fff",borderRadius:13,padding:"16px 18px",border:"1px solid #F1F5F9"}}>
           <div style={{fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:14}}>Sul vs Sudeste</div>
-          <ResponsiveContainer width="100%" height={180}>
+          <ResponsiveContainer width="100%" height={160}>
             <PieChart>
-              <Pie data={regiaoData} cx="50%" cy="45%" innerRadius={40} outerRadius={65} dataKey="value" paddingAngle={3}>
+              <Pie data={regiaoData} cx="50%" cy="45%" innerRadius={35} outerRadius={58} dataKey="value" paddingAngle={3}>
                 {regiaoData.map((p,i)=><Cell key={i} fill={["#3B82F6","#10B981","#8B5CF6"][i]}/>)}
               </Pie>
-              <Tooltip content={<Tip/>}/>
-              <Legend iconType="circle" iconSize={7} formatter={v=><span style={{fontSize:10,color:"#475569"}}>{v}</span>}/>
+              <Tooltip content={<Tip/>}/><Legend iconType="circle" iconSize={7} formatter={v=><span style={{fontSize:10,color:"#475569"}}>{v}</span>}/>
             </PieChart>
           </ResponsiveContainer>
         </div>
         <div style={{background:"#fff",borderRadius:13,padding:"16px 18px",border:"1px solid #F1F5F9"}}>
           <div style={{fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:14}}>Designed vs Non Designed</div>
-          <ResponsiveContainer width="100%" height={180}>
+          <ResponsiveContainer width="100%" height={160}>
             <PieChart>
-              <Pie data={dsiData} cx="50%" cy="45%" innerRadius={40} outerRadius={65} dataKey="value" paddingAngle={3}>
+              <Pie data={dsiData} cx="50%" cy="45%" innerRadius={35} outerRadius={58} dataKey="value" paddingAngle={3}>
                 {dsiData.map((p,i)=><Cell key={i} fill={p.fill}/>)}
               </Pie>
-              <Tooltip content={<Tip/>}/>
-              <Legend iconType="circle" iconSize={7} formatter={v=><span style={{fontSize:10,color:"#475569"}}>{v}</span>}/>
+              <Tooltip content={<Tip/>}/><Legend iconType="circle" iconSize={7} formatter={v=><span style={{fontSize:10,color:"#475569"}}>{v}</span>}/>
             </PieChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       <div style={{background:"#fff",borderRadius:13,border:"1px solid #F1F5F9",overflow:"hidden"}}>
-        <div style={{padding:"13px 18px",borderBottom:"1px solid #F8FAFC",fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em"}}>Cobertura por Estado</div>
-        <table style={{width:"100%",borderCollapse:"collapse"}}>
-          <thead><tr style={{background:"#F8FAFC"}}>
-            {["Estado","Região","Total Atividades","Treinamentos","Designed","Non Designed"].map(h=>(
-              <th key={h} style={{padding:"9px 14px",textAlign:"left",fontSize:11,fontWeight:700,color:"#94A3B8",textTransform:"uppercase"}}>{h}</th>
-            ))}
-          </tr></thead>
-          <tbody>
-            {treinByEstado.map((r,i)=>{
-              const regiao = ["PR","RS","SC"].includes(r.estado)?"Sul":"Sudeste";
-              return (
-                <tr key={r.estado} style={{background:i%2===0?"#fff":"#FAFBFC"}}>
-                  <td style={{padding:"9px 14px"}}><Tag label={r.estado} color={ESTADO_COLOR[r.estado]||"#64748B"}/></td>
-                  <td style={{padding:"9px 14px",fontSize:12,color:"#475569"}}>{regiao}</td>
-                  <td style={{padding:"9px 14px",fontSize:15,fontWeight:800,color:"#6366F1"}}>{activities.filter(a=>a.Estado===r.estado).length}</td>
-                  <td style={{padding:"9px 14px",fontSize:13,fontWeight:700,color:"#10B981"}}>{r.total}</td>
-                  <td style={{padding:"9px 14px",fontSize:13,fontWeight:700,color:"#10B981"}}>{r.designed}</td>
-                  <td style={{padding:"9px 14px",fontSize:13,fontWeight:700,color:"#EF4444"}}>{r.nonDesigned}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div style={{padding:"13px 18px",borderBottom:"1px solid #F8FAFC",display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em"}}>✅ Designed System Integrators</span>
+          <Tag label="Designed" color="#10B981"/>
+        </div>
+        {renderTable("Designed")}
       </div>
 
-      <div style={{background:"#fff",borderRadius:13,border:"1px solid #F1F5F9",overflow:"hidden"}}>
-        <div style={{padding:"13px 18px",borderBottom:"1px solid #F8FAFC",fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em"}}>Treinamentos por Tipo</div>
-        <div style={{padding:"16px 18px",display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+      <div style={{background:"#fff",borderRadius:13,border:"1px solid #FEE2E2",overflow:"hidden"}}>
+        <div style={{padding:"13px 18px",borderBottom:"1px solid #FEE2E2",display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em"}}>🔴 Non Designed System Integrators</span>
+          <Tag label="Non Designed" color="#EF4444"/>
+        </div>
+        {renderTable("Non Designed")}
+      </div>
+
+      <div style={{background:"#fff",borderRadius:13,padding:"16px 18px",border:"1px solid #F1F5F9"}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:14}}>Treinamentos por Classificação</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
           {TIPO_TREIN.map(tipo=>{
-            const n = activities.filter(a=>a["Tipo Treinamento"]===tipo).length;
-            const color = {"SBI":"#3B82F6","SBF":"#8B5CF6","SBC":"#F97316"}[tipo];
-            return (
+            const n=filteredTrein.filter(a=>a["Tipo Treinamento"]===tipo).length;
+            const color={"SBI":"#3B82F6","SBF":"#8B5CF6","SBC":"#F97316"}[tipo];
+            return(
               <div key={tipo} style={{background:color+"11",borderRadius:10,padding:"14px 16px",border:`1px solid ${color}33`}}>
                 <div style={{fontSize:11,fontWeight:700,color,textTransform:"uppercase",marginBottom:6}}>{tipo}</div>
                 <div style={{fontSize:28,fontWeight:800,color}}>{n}</div>
