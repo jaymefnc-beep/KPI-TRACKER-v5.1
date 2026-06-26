@@ -36,7 +36,7 @@ const createActivity = d => apiFetch("/api/activities",{method:"POST",body:JSON.
 const updateActivity = (id,d) => apiFetch(`/api/activities/${id}`,{method:"PUT",body:JSON.stringify(d)});
 const deleteActivity = id => apiFetch(`/api/activities/${id}`,{method:"DELETE"});
 
-const fmt = v => !v?"—":v>=1000000?`R$${(v/1000000).toFixed(1)}M`:v>=1000?`R$${(v/1000).toFixed(0)}k`:`R$${Number(v).toFixed(0)}`;
+const fmt = v => !v?"—":v>=1000000?`US$${(v/1000000).toFixed(1)}M`:v>=1000?`US$${(v/1000).toFixed(0)}k`:`US$${Number(v).toFixed(0)}`;
 const Tag = ({label,color}) => <span style={{background:color+"22",color,borderRadius:5,padding:"2px 8px",fontSize:11,fontWeight:700,whiteSpace:"nowrap"}}>{label}</span>;
 const Tip = ({active,payload,label}) => {
   if (!active||!payload?.length) return null;
