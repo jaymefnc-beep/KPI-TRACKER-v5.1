@@ -2,7 +2,6 @@ import { notion, DATABASE_ID, pageToActivity } from "../../lib/notion";
 
 export default async function handler(req, res) {
   try {
-    // Fetch all activities with deadlines
     let allResults = [];
     let hasMore = true;
     let startCursor = undefined;
@@ -10,10 +9,7 @@ export default async function handler(req, res) {
     while (hasMore) {
       const response = await notion.databases.query({
         database_id: DATABASE_ID,
-        filter: {
-          property: "Deadline",
-          date: { is_not_empty: true }
-        },
+        filter: { property: "Deadline", date: { is_not_empty: true } },
         sorts: [{ property: "Deadline", direction: "ascending" }],
         page_size: 100,
         start_cursor: startCursor,
@@ -24,70 +20,46 @@ export default async function handler(req, res) {
     }
 
     const activities = allResults.map(pageToActivity).filter(a => a.Deadline);
-
-    // Build ICS
     const now = new Date().toISOString().replace(/[-:.]/g,"").slice(0,15) + "Z";
+
     const lines = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
       "PRODID:-//Hikvision KPI Tracker//EN",
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
-      "X-WR-CALNAME:KPI Tracker — Deadlines",
-      "X-WR-CALDESC:Deadlines de atividades do KPI Tracker Pre-Sales Gov",
-      "X-WR-TIMEZONE:America/Sao_Paulo",
+      "X-WR-CALNAME:KPI Tracker Deadlines",
+      "X-WR-CALDESC:Deadlines Pre-Sales Gov",
       "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
       "X-PUBLISHED-TTL:PT1H",
     ];
 
     activities.forEach(a => {
       const dl = a.Deadline.replace(/-/g, "");
-      // Next day for DTEND (all-day event convention)
       const dlDate = new Date(a.Deadline + "T12:00:00");
       dlDate.setDate(dlDate.getDate() + 1);
       const dlEnd = dlDate.toISOString().slice(0,10).replace(/-/g,"");
-
-      // Urgency indicator
       const today = new Date(); today.setHours(0,0,0,0);
-      const deadlineDate = new Date(a.Deadline + "T00:00:00");
-      const daysLeft = Math.ceil((deadlineDate - today) / 86400000);
-      const urgency = daysLeft < 0 ? "🔴 VENCIDO" : daysLeft <= 3 ? "🔴" : daysLeft <= 7 ? "🟠" : daysLeft <= 14 ? "🟡" : "🟢";
+      const daysLeft = Math.ceil((new Date(a.Deadline + "T00:00:00") - today) / 86400000);
+      const urgency = daysLeft < 0 ? "VENCIDO" : daysLeft <= 3 ? "URGENTE" : daysLeft <= 7 ? "PROXIMO" : "OK";
+      const title = `[${urgency}] ${a.Categoria}: ${a.Atividade || a["Cliente Final"] || "Atividade"}`;
+      const desc = [`Status: ${a.Status}`, a["Cliente Final"] ? `Cliente: ${a["Cliente Final"]}` : "", a.Integrador ? `SI: ${a.Integrador}` : "", a.Estado ? `Estado: ${a.Estado}` : ""].filter(Boolean).join("\\n");
 
-      const title = `${urgency} [${a.Categoria}] ${a.Atividade || a["Cliente Final"] || "Atividade"}`;
-      const desc = [
-        `Categoria: ${a.Categoria}`,
-        a.Etapa ? `Etapa: ${a.Etapa}` : "",
-        `Status: ${a.Status}`,
-        a["Cliente Final"] ? `Cliente: ${a["Cliente Final"]}` : "",
-        a.Integrador ? `Integrador: ${a.Integrador}` : "",
-        a.Estado ? `Estado: ${a.Estado}` : "",
-        a.Quarter ? `Quarter: ${a.Quarter}` : "",
-        a.Observações ? `Obs: ${a.Observações}` : "",
-        `Dias restantes: ${daysLeft < 0 ? `${Math.abs(daysLeft)} dias em atraso` : `${daysLeft} dias`}`,
-      ].filter(Boolean).join("\\n");
-
-      // Alarm: 3 days before
       lines.push("BEGIN:VEVENT");
-      lines.push(`UID:kpi-${a.id}@hikvision-presales`);
+      lines.push(`UID:kpi-${a.id}@hikvision`);
       lines.push(`DTSTAMP:${now}`);
       lines.push(`DTSTART;VALUE=DATE:${dl}`);
       lines.push(`DTEND;VALUE=DATE:${dlEnd}`);
       lines.push(`SUMMARY:${title}`);
       lines.push(`DESCRIPTION:${desc}`);
-      lines.push(`CATEGORIES:${a.Categoria},KPI Tracker`);
-      // Color coding via status
-      const statusColor = a.Status === "Concluído" ? "5" : a.Status === "Suspenso" ? "2" : "6";
-      lines.push(`X-APPLE-CALENDAR-COLOR:#${a.Status==="Concluído"?"10B981":a.Status==="Suspenso"?"EF4444":"F97316"}`);
-      // 3-day advance alarm
       lines.push("BEGIN:VALARM");
       lines.push("ACTION:DISPLAY");
-      lines.push(`DESCRIPTION:Deadline em 3 dias: ${a.Atividade||a["Cliente Final"]||""}`);
+      lines.push(`DESCRIPTION:Deadline em 3 dias: ${a["Cliente Final"]||a.Atividade||""}`);
       lines.push("TRIGGER:-P3D");
       lines.push("END:VALARM");
-      // Same-day alarm
       lines.push("BEGIN:VALARM");
       lines.push("ACTION:DISPLAY");
-      lines.push(`DESCRIPTION:⚠️ Deadline hoje: ${a.Atividade||a["Cliente Final"]||""}`);
+      lines.push(`DESCRIPTION:Deadline HOJE: ${a["Cliente Final"]||a.Atividade||""}`);
       lines.push("TRIGGER:PT9H");
       lines.push("END:VALARM");
       lines.push("END:VEVENT");
@@ -95,13 +67,9 @@ export default async function handler(req, res) {
 
     lines.push("END:VCALENDAR");
 
-    const ics = lines.join("\r\n");
-
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
-    res.setHeader("Content-Disposition", "inline; filename=kpi-tracker.ics");
-    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.status(200).send(ics);
+    res.setHeader("Cache-Control", "no-cache");
+    res.status(200).send(lines.join("\r\n"));
 
   } catch(e) {
     res.status(500).json({ error: e.message });
