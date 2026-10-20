@@ -610,10 +610,10 @@ function CalendarView(){
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:8}}>
             {cells.map((dt,i)=>{
-              if(!dt)return <div key={i} style={{minHeight:120,borderRadius:10,background:"#FAFBFC"}}/>;
+              if(!dt)return <div key={i} style={{minHeight:84,borderRadius:10,background:"#FAFBFC"}}/>;
               const iso=agYmd(dt);const items=byDay[iso]||[];const isToday=iso===today;
               return (
-                <div key={i} onClick={()=>newEntry(iso)} style={{minHeight:120,borderRadius:10,border:isToday?"2px solid #6366F1":"1px solid #F1F5F9",background:isToday?"#F5F7FF":"#fff",padding:"8px 9px",cursor:"pointer"}}>
+                <div key={i} onClick={()=>newEntry(iso)} style={{minHeight:84,borderRadius:10,border:isToday?"2px solid #6366F1":"1px solid #F1F5F9",background:isToday?"#F5F7FF":"#fff",padding:"8px 9px",cursor:"pointer"}}>
                   <div style={{fontSize:13,fontWeight:isToday?800:600,color:isToday?"#6366F1":"#475569",marginBottom:6}}>{dt.getDate()}</div>
                   <div style={{display:"flex",flexDirection:"column",gap:4}}>
                     {items.map(e=>(
@@ -825,7 +825,7 @@ export default function App() {
       <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}`}</style>
 
       <div style={{background:"#0F172A",padding:"0 24px"}}>
-        <div style={{maxWidth:1200,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
+        <div style={{maxWidth:tab==="calendario"?1600:1200,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:30,height:30,borderRadius:7,background:"#6366F1",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#fff"}}>H</div>
             <span style={{fontSize:14,fontWeight:700,color:"#fff"}}>KPI Tracker — Pre-Sales Gov</span>
@@ -851,7 +851,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{maxWidth:1200,margin:"0 auto",padding:"24px"}}>
+      <div style={{maxWidth:tab==="calendario"?1600:1200,margin:"0 auto",padding:"24px"}}>
 
         {/* ── UPCOMING DEADLINES BANNER ── */}
         {tab==="dashboard"&&upcomingDeadlines.length>0&&(
