@@ -523,6 +523,169 @@ const ExecutiveView = ({activities,quarter}) => {
   );
 };
 
+// ─── CALENDAR / AGENDA VIEW ──────────────────────────────────────────────────
+const AG_TIPOS=["Visita","Reunião","Treinamento","Suporte","Interno","Deslocamento","Outro"];
+const AG_COLOR={"Visita":"#6366F1","Reunião":"#0EA5E9","Treinamento":"#10B981","Suporte":"#F59E0B","Interno":"#64748B","Deslocamento":"#8B5CF6","Outro":"#94A3B8"};
+const AG_MESES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const AG_DIAS=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+const agYmd=d=>{const z=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`;};
+const agDiaLongo=iso=>{if(!iso)return "";const[y,m,d]=iso.split("-").map(Number);const dt=new Date(y,m-1,d);return `${AG_DIAS[dt.getDay()]}, ${d} de ${AG_MESES[m-1]} de ${y}`;};
+
+function CalendarView(){
+  const [entries,setEntries]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [cur,setCur]=useState(()=>{const n=new Date();return {y:n.getFullYear(),m:n.getMonth()};});
+  const [selDay,setSelDay]=useState(null);
+  const [form,setForm]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const [present,setPresent]=useState(false);
+  const [pIdx,setPIdx]=useState(0);
+  const [err,setErr]=useState("");
+
+  const load=useCallback(async()=>{setLoading(true);try{const d=await apiFetch("/api/agenda");setEntries(d);setErr("");}catch(e){setErr(e.message);}setLoading(false);},[]);
+  useEffect(()=>{load();},[load]);
+
+  const byDay={};
+  entries.forEach(e=>{if(e.Data){(byDay[e.Data]=byDay[e.Data]||[]).push(e);}});
+
+  const first=new Date(cur.y,cur.m,1);
+  const startDow=first.getDay();
+  const dim=new Date(cur.y,cur.m+1,0).getDate();
+  const cells=[];
+  for(let i=0;i<startDow;i++)cells.push(null);
+  for(let d=1;d<=dim;d++)cells.push(new Date(cur.y,cur.m,d));
+  while(cells.length%7)cells.push(null);
+  const today=agYmd(new Date());
+  const prevM=()=>setCur(c=>{const m=c.m-1;return m<0?{y:c.y-1,m:11}:{y:c.y,m};});
+  const nextM=()=>setCur(c=>{const m=c.m+1;return m>11?{y:c.y+1,m:0}:{y:c.y,m};});
+
+  const newEntry=iso=>{setForm({Atividade:"",Tipo:"Visita",Local:"",Descricao:"",Data:iso});};
+  const editEntry=e=>setForm({...e});
+  const save=async()=>{
+    if(!form.Atividade.trim()){setErr("Informe a atividade");return;}
+    setSaving(true);setErr("");
+    try{
+      if(form.id)await apiFetch(`/api/agenda/${form.id}`,{method:"PUT",body:JSON.stringify(form)});
+      else await apiFetch("/api/agenda",{method:"POST",body:JSON.stringify(form)});
+      setForm(null);await load();
+    }catch(e){setErr(e.message);}
+    setSaving(false);
+  };
+  const del=async(id)=>{if(!window.confirm("Excluir este registro?"))return;try{await apiFetch(`/api/agenda/${id}`,{method:"DELETE"});await load();}catch(e){setErr(e.message);}};
+
+  const pDays=Object.keys(byDay).sort();
+  const startPresent=()=>{if(pDays.length===0){setErr("Sem registros para apresentar");return;}const i=pDays.indexOf(today);setPIdx(i>=0?i:0);setPresent(true);};
+
+  useEffect(()=>{
+    if(!present)return;
+    const h=e=>{if(e.key==="ArrowRight")setPIdx(i=>Math.min(i+1,pDays.length-1));else if(e.key==="ArrowLeft")setPIdx(i=>Math.max(i-1,0));else if(e.key==="Escape")setPresent(false);};
+    window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);
+  },[present,pDays.length]);
+
+  const card={background:"#fff",borderRadius:13,border:"1px solid #F1F5F9",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"};
+  const inp={width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #E2E8F0",fontSize:13,outline:"none",boxSizing:"border-box"};
+  const chip=t=><span style={{background:(AG_COLOR[t]||"#94A3B8")+"22",color:AG_COLOR[t]||"#94A3B8",borderRadius:5,padding:"1px 7px",fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>{t}</span>;
+
+  return (
+    <div>
+      {/* toolbar */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <button onClick={prevM} style={{...inp,width:"auto",cursor:"pointer",fontWeight:700}}>◀</button>
+          <div style={{fontSize:18,fontWeight:800,color:"#1E293B",minWidth:170,textAlign:"center"}}>{AG_MESES[cur.m]} {cur.y}</div>
+          <button onClick={nextM} style={{...inp,width:"auto",cursor:"pointer",fontWeight:700}}>▶</button>
+          <button onClick={()=>{const n=new Date();setCur({y:n.getFullYear(),m:n.getMonth()});}} style={{...inp,width:"auto",cursor:"pointer",color:"#6366F1",fontWeight:700}}>Hoje</button>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>newEntry(today)} style={{padding:"8px 14px",borderRadius:8,border:"none",background:"#6366F1",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700}}>+ Nova atividade</button>
+          <button onClick={startPresent} style={{padding:"8px 14px",borderRadius:8,border:"none",background:"#0F172A",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700}}>▶ Apresentar</button>
+        </div>
+      </div>
+      {err&&<div style={{background:"#FEF2F2",color:"#EF4444",borderRadius:8,padding:"8px 12px",fontSize:12,marginBottom:12,fontWeight:600}}>{err}</div>}
+      {loading?<div style={{...card,padding:40,textAlign:"center",color:"#94A3B8"}}>Carregando agenda...</div>:(
+      <div style={{...card,padding:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6,marginBottom:6}}>
+          {AG_DIAS.map(d=><div key={d} style={{textAlign:"center",fontSize:11,fontWeight:700,color:"#94A3B8",textTransform:"uppercase"}}>{d}</div>)}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6}}>
+          {cells.map((dt,i)=>{
+            if(!dt)return <div key={i} style={{minHeight:92,borderRadius:9,background:"#FAFBFC"}}/>;
+            const iso=agYmd(dt);const items=byDay[iso]||[];const isToday=iso===today;
+            return (
+              <div key={i} onClick={()=>newEntry(iso)} style={{minHeight:92,borderRadius:9,border:isToday?"2px solid #6366F1":"1px solid #F1F5F9",background:"#fff",padding:"6px 7px",cursor:"pointer",overflow:"hidden"}}>
+                <div style={{fontSize:12,fontWeight:isToday?800:600,color:isToday?"#6366F1":"#475569",marginBottom:4}}>{dt.getDate()}</div>
+                <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                  {items.slice(0,3).map(e=>(
+                    <div key={e.id} onClick={ev=>{ev.stopPropagation();editEntry(e);}} title={e.Atividade} style={{background:(AG_COLOR[e.Tipo]||"#94A3B8")+"1A",borderLeft:`3px solid ${AG_COLOR[e.Tipo]||"#94A3B8"}`,borderRadius:4,padding:"1px 5px",fontSize:10,color:"#334155",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",fontWeight:600}}>{e.Atividade||e.Tipo}</div>
+                  ))}
+                  {items.length>3&&<div style={{fontSize:9,color:"#94A3B8",fontWeight:700}}>+{items.length-3} mais</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>)}
+
+      {/* FORM / DAY MODAL */}
+      {form&&(
+        <div onClick={()=>setForm(null)} style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.5)",zIndex:1500,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div onClick={e=>e.stopPropagation()} style={{...card,padding:22,width:460,maxWidth:"100%",maxHeight:"90vh",overflow:"auto"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+              <div style={{fontSize:16,fontWeight:800,color:"#1E293B"}}>{form.id?"Editar atividade":"Nova atividade"}</div>
+              <button onClick={()=>setForm(null)} style={{border:"none",background:"transparent",fontSize:20,color:"#94A3B8",cursor:"pointer"}}>×</button>
+            </div>
+            <div style={{fontSize:12,color:"#64748B",marginBottom:14}}>{agDiaLongo(form.Data)}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div><label style={{fontSize:11,fontWeight:700,color:"#64748B"}}>Atividade</label><input style={inp} value={form.Atividade} onChange={e=>setForm({...form,Atividade:e.target.value})} placeholder="O que foi feito"/></div>
+              <div style={{display:"flex",gap:10}}>
+                <div style={{flex:1}}><label style={{fontSize:11,fontWeight:700,color:"#64748B"}}>Tipo</label><select style={inp} value={form.Tipo} onChange={e=>setForm({...form,Tipo:e.target.value})}>{AG_TIPOS.map(t=><option key={t}>{t}</option>)}</select></div>
+                <div style={{flex:1}}><label style={{fontSize:11,fontWeight:700,color:"#64748B"}}>Data</label><input type="date" style={inp} value={form.Data} onChange={e=>setForm({...form,Data:e.target.value})}/></div>
+              </div>
+              <div><label style={{fontSize:11,fontWeight:700,color:"#64748B"}}>Local / Cliente</label><input style={inp} value={form.Local} onChange={e=>setForm({...form,Local:e.target.value})} placeholder="Opcional"/></div>
+              <div><label style={{fontSize:11,fontWeight:700,color:"#64748B"}}>Descrição</label><textarea style={{...inp,minHeight:70,resize:"vertical"}} value={form.Descricao} onChange={e=>setForm({...form,Descricao:e.target.value})} placeholder="Detalhes para evidenciar a ação"/></div>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:16}}>
+              {form.id?<button onClick={()=>{del(form.id);setForm(null);}} style={{padding:"8px 12px",borderRadius:8,border:"1px solid #FECACA",background:"#fff",color:"#EF4444",cursor:"pointer",fontSize:12,fontWeight:700}}>Excluir</button>:<span/>}
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>setForm(null)} style={{padding:"8px 14px",borderRadius:8,border:"1px solid #E2E8F0",background:"#fff",color:"#475569",cursor:"pointer",fontSize:12,fontWeight:700}}>Cancelar</button>
+                <button onClick={save} disabled={saving} style={{padding:"8px 16px",borderRadius:8,border:"none",background:"#6366F1",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700}}>{saving?"Salvando...":"Salvar"}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PRESENTATION MODE */}
+      {present&&pDays.length>0&&(()=>{
+        const day=pDays[pIdx];const items=byDay[day]||[];
+        return (
+        <div style={{position:"fixed",inset:0,background:"#0F172A",zIndex:3000,display:"flex",flexDirection:"column",padding:"32px 40px",color:"#fff"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <div style={{fontSize:13,color:"#94A3B8",fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase"}}>Agenda — Evidências do dia</div>
+            <button onClick={()=>setPresent(false)} style={{border:"none",background:"#1E293B",color:"#94A3B8",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:13}}>✕ Sair (Esc)</button>
+          </div>
+          <div style={{fontSize:34,fontWeight:800,marginBottom:4,textTransform:"capitalize"}}>{agDiaLongo(day)}</div>
+          <div style={{fontSize:14,color:"#6366F1",fontWeight:700,marginBottom:24}}>{items.length} {items.length===1?"ação registrada":"ações registradas"}</div>
+          <div style={{flex:1,overflow:"auto",display:"grid",gridTemplateColumns:items.length>3?"1fr 1fr":"1fr",gap:14,alignContent:"start"}}>
+            {items.map(e=>(
+              <div key={e.id} style={{background:"#1E293B",borderRadius:14,padding:"18px 20px",borderLeft:`5px solid ${AG_COLOR[e.Tipo]||"#94A3B8"}`}}>
+                <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}>{chip(e.Tipo)}{e.Local&&<span style={{fontSize:12,color:"#94A3B8"}}>· {e.Local}</span>}</div>
+                <div style={{fontSize:20,fontWeight:800,marginBottom:e.Descricao?8:0}}>{e.Atividade}</div>
+                {e.Descricao&&<div style={{fontSize:14,color:"#CBD5E1",lineHeight:1.5,whiteSpace:"pre-wrap"}}>{e.Descricao}</div>}
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:20}}>
+            <button onClick={()=>setPIdx(i=>Math.max(i-1,0))} disabled={pIdx===0} style={{border:"none",background:pIdx===0?"#1E293B":"#6366F1",color:"#fff",borderRadius:10,padding:"10px 20px",cursor:pIdx===0?"default":"pointer",fontSize:14,fontWeight:700,opacity:pIdx===0?0.4:1}}>◀ Anterior</button>
+            <div style={{fontSize:13,color:"#94A3B8"}}>Dia {pIdx+1} de {pDays.length}</div>
+            <button onClick={()=>setPIdx(i=>Math.min(i+1,pDays.length-1))} disabled={pIdx===pDays.length-1} style={{border:"none",background:pIdx===pDays.length-1?"#1E293B":"#6366F1",color:"#fff",borderRadius:10,padding:"10px 20px",cursor:pIdx===pDays.length-1?"default":"pointer",fontSize:14,fontWeight:700,opacity:pIdx===pDays.length-1?0.4:1}}>Próximo ▶</button>
+          </div>
+        </div>);
+      })()}
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [tab,setTab] = useState("dashboard");
@@ -659,6 +822,7 @@ export default function App() {
               {btnTab("regioes","🗺️ Regiões")}
               {btnTab("executive","📈 Executivo")}
               {btnTab("log","📋 Log")}
+              {btnTab("calendario","📅 Calendário")}
             </div>
             <select style={{...sel,background:"#1E293B",color:"#94A3B8",borderColor:"#334155"}} value={quarter} onChange={e=>setQuarter(e.target.value)}>
               {QUARTERS.map(q=><option key={q}>{q}</option>)}
@@ -756,6 +920,7 @@ export default function App() {
         {tab==="kanban"&&<KanbanView activities={activities} onStatusChange={handleStatusChange}/>}
         {tab==="regioes"&&<RegionView activities={allActivities.length>0?allActivities:activities}/>}
         {tab==="executive"&&<ExecutiveView activities={activities} quarter={quarter}/>}
+        {tab==="calendario"&&<CalendarView/>}
 
         {tab==="log"&&(
           <>
