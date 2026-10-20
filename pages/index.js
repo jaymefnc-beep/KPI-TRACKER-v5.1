@@ -603,26 +603,41 @@ function CalendarView(){
       </div>
       {err&&<div style={{background:"#FEF2F2",color:"#EF4444",borderRadius:8,padding:"8px 12px",fontSize:12,marginBottom:12,fontWeight:600}}>{err}</div>}
       {loading?<div style={{...card,padding:40,textAlign:"center",color:"#94A3B8"}}>Carregando agenda...</div>:(
-      <div style={{...card,padding:14}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6,marginBottom:6}}>
-          {AG_DIAS.map(d=><div key={d} style={{textAlign:"center",fontSize:11,fontWeight:700,color:"#94A3B8",textTransform:"uppercase"}}>{d}</div>)}
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6}}>
-          {cells.map((dt,i)=>{
-            if(!dt)return <div key={i} style={{minHeight:92,borderRadius:9,background:"#FAFBFC"}}/>;
-            const iso=agYmd(dt);const items=byDay[iso]||[];const isToday=iso===today;
-            return (
-              <div key={i} onClick={()=>newEntry(iso)} style={{minHeight:92,borderRadius:9,border:isToday?"2px solid #6366F1":"1px solid #F1F5F9",background:"#fff",padding:"6px 7px",cursor:"pointer",overflow:"hidden"}}>
-                <div style={{fontSize:12,fontWeight:isToday?800:600,color:isToday?"#6366F1":"#475569",marginBottom:4}}>{dt.getDate()}</div>
-                <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                  {items.slice(0,3).map(e=>(
-                    <div key={e.id} onClick={ev=>{ev.stopPropagation();editEntry(e);}} title={e.Atividade} style={{background:(AG_COLOR[e.Tipo]||"#94A3B8")+"1A",borderLeft:`3px solid ${AG_COLOR[e.Tipo]||"#94A3B8"}`,borderRadius:4,padding:"1px 5px",fontSize:10,color:"#334155",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",fontWeight:600}}>{e.Atividade||e.Tipo}</div>
-                  ))}
-                  {items.length>3&&<div style={{fontSize:9,color:"#94A3B8",fontWeight:700}}>+{items.length-3} mais</div>}
+      <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+        <div style={{...card,padding:16,flex:1,minWidth:0}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:8,marginBottom:8}}>
+            {AG_DIAS.map(d=><div key={d} style={{textAlign:"center",fontSize:12,fontWeight:700,color:"#94A3B8",textTransform:"uppercase"}}>{d}</div>)}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:8}}>
+            {cells.map((dt,i)=>{
+              if(!dt)return <div key={i} style={{minHeight:120,borderRadius:10,background:"#FAFBFC"}}/>;
+              const iso=agYmd(dt);const items=byDay[iso]||[];const isToday=iso===today;
+              return (
+                <div key={i} onClick={()=>newEntry(iso)} style={{minHeight:120,borderRadius:10,border:isToday?"2px solid #6366F1":"1px solid #F1F5F9",background:isToday?"#F5F7FF":"#fff",padding:"8px 9px",cursor:"pointer"}}>
+                  <div style={{fontSize:13,fontWeight:isToday?800:600,color:isToday?"#6366F1":"#475569",marginBottom:6}}>{dt.getDate()}</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                    {items.map(e=>(
+                      <div key={e.id} onClick={ev=>{ev.stopPropagation();editEntry(e);}} title={e.Descricao||e.Atividade} style={{background:(AG_COLOR[e.Tipo]||"#94A3B8")+"1A",borderLeft:`3px solid ${AG_COLOR[e.Tipo]||"#94A3B8"}`,borderRadius:5,padding:"3px 6px",fontSize:11,lineHeight:1.3,color:"#334155",whiteSpace:"normal",wordBreak:"break-word",fontWeight:600}}>{e.Atividade||e.Tipo}{e.Local?<span style={{display:"block",fontSize:9,color:"#94A3B8",fontWeight:500}}>{e.Local}</span>:null}</div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        </div>
+        <div style={{...card,padding:16,width:230,flexShrink:0}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:12}}>Legenda — Tipo</div>
+          <div style={{display:"flex",flexDirection:"column",gap:2}}>
+            {AG_TIPOS.map(t=>{const n=entries.filter(e=>e.Tipo===t).length;return(
+              <div key={t} style={{display:"flex",alignItems:"center",gap:9,padding:"7px 8px",borderRadius:7,background:"#FAFBFC"}}>
+                <span style={{width:13,height:13,borderRadius:4,background:AG_COLOR[t],flexShrink:0}}/>
+                <span style={{fontSize:12,color:"#334155",fontWeight:600,flex:1}}>{t}</span>
+                <span style={{fontSize:11,color:"#94A3B8",fontWeight:700}}>{n}</span>
+              </div>);})}
+          </div>
+          <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #F1F5F9",fontSize:11,color:"#94A3B8",lineHeight:1.5}}>
+            Total do mês: <b style={{color:"#475569"}}>{Object.keys(byDay).filter(d=>{const p=d.split("-").map(Number);return p[0]===cur.y&&p[1]===cur.m+1;}).reduce((s,d)=>s+byDay[d].length,0)}</b> atividades
+          </div>
         </div>
       </div>)}
 
